@@ -1,0 +1,4 @@
+<resources>
+    <item name="drag_dot" type="id" />
+    <item name="drag_color" type="id" />
+</resources>

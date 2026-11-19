@@ -7,23 +7,35 @@ android {
     namespace = "com.authnotes"
 
     compileSdk {
-        version = release(33)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "com.authnotes"
         minSdk = 33
         targetSdk = 33
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
 
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
 }
 
@@ -36,12 +48,12 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.material)
+    implementation(libs.androidx.sqlite)
+    implementation(libs.sqlcipher)
+    implementation(libs.zxing.core)
 
+    // Existing template test sources are retained; agent does not run test tasks.
     testImplementation(libs.junit)
-
-    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
