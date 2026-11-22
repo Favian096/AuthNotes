@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/home_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@color/surface"
+            android:gravity="center_vertical">
+
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="match_parent">
+
+                <ImageView
+                    android:id="@+id/home_menu"
+                    style="@style/Widget.AuthNotes.ToolbarIcon"
+                    android:contentDescription="@string/drawer_open"
+                    android:src="@drawable/nav_menu" />
+
+                <ImageView
+                    android:id="@+id/home_back"
+                    style="@style/Widget.AuthNotes.ToolbarIcon"
+                    android:alpha="0"
+                    android:contentDescription="@string/drawer_close"
+                    android:src="@drawable/nav_back"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/home_title_slot"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/home_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/home_search"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:alpha="0"
+                    android:saveEnabled="false"
+                    android:visibility="invisible" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="match_parent">
+
+                <ImageView
+                    android:id="@+id/home_search_open"
+                    style="@style/Widget.AuthNotes.ToolbarIcon"
+                    android:contentDescription="@string/search_open"
+                    android:src="@drawable/nav_search" />
+
+                <ImageView
+                    android:id="@+id/home_search_close"
+                    style="@style/Widget.AuthNotes.ToolbarIcon"
+                    android:alpha="0"
+                    android:contentDescription="@string/search_close"
+                    android:src="@drawable/nav_close"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/home_add_panel"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:elevation="3dp"
+            android:clipToOutline="true"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/home_add_reveal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:scaleX="0" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/home_page_host"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+</FrameLayout>

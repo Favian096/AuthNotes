@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import com.authnotes.security.MasterKeyVault
 import com.authnotes.security.Totp
-import com.authnotes.security.TotpConfig
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -64,8 +63,7 @@ class VaultStore(private val context: Context) {
             VaultDatabase.open(stageFile, password).use { imported ->
                 imported.validateImportedFile()
                 imported.totpAccounts().forEach { account ->
-                    Totp.code(TotpConfig(account.issuer, account.account, account.secret, account.algorithm,
-                        account.digits, account.period, account.type, account.counter))
+                    Totp.code(account.otpConfig())
                 }
             }
             return installStage(password)

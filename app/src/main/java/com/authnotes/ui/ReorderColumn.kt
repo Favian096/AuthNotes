@@ -1,13 +1,14 @@
 package com.authnotes.ui
 
 import android.content.Context
+import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 
 /** Vertical reordering with the real row under the finger and animated space for its neighbors. */
-class ReorderColumn(context: Context) : LinearLayout(context) {
+class ReorderColumn @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : LinearLayout(context, attrs) {
     var onOrderChanged: (() -> Unit)? = null
     var onDragStateChanged: ((Boolean) -> Unit)? = null
     var onEdgeDrag: ((Float) -> Unit)? = null

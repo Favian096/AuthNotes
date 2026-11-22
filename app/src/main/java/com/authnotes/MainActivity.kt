@@ -30,6 +30,7 @@ import com.authnotes.data.AccountCard
 import com.authnotes.data.CardAttachment
 import com.authnotes.data.NewCardAttachment
 import com.authnotes.data.TotpAccount
+import com.authnotes.data.otpConfig
 import com.authnotes.data.VaultDatabase
 import com.authnotes.data.VaultStore
 import com.authnotes.security.TimeCorrection
@@ -38,7 +39,9 @@ import com.authnotes.security.TotpConfig
 import com.authnotes.security.GoogleMigration
 import com.authnotes.ui.SmoothDrawable
 import com.authnotes.ui.UnderlineDrawable
-import com.authnotes.ui.ColorDotView
+import com.authnotes.ui.home.AccountListPage
+import com.authnotes.ui.home.AuthenticatorListPage
+import com.authnotes.ui.migration.MigrationPage
 import com.authnotes.ui.ColorStripView
 import com.authnotes.ui.EncryptedDatabaseIconView
 import com.authnotes.ui.ReorderColumn
@@ -46,10 +49,6 @@ import com.authnotes.ui.FloatingEditorDialog
 import com.authnotes.ui.ActionIconView
 import com.authnotes.ui.decodeAttachmentPreview
 import com.authnotes.ui.ZoomRotateImageView
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.io.ByteArrayOutputStream
 import java.util.Date
 import java.util.Locale
@@ -72,11 +71,8 @@ class MainActivity : Activity() {
     private var detailShowing = false
     private val queries = arrayOf("", "")
     private val searchShown = booleanArrayOf(false, false)
-    private var currentCards = emptyList<AccountCard>()
-    private val codeViews = mutableListOf<Triple<TotpAccount, TextView, View>>()
     private var offsetMillis = 0L
     private lateinit var root: FrameLayout
-    private lateinit var layout: LinearLayout
     private lateinit var bar: LinearLayout
     private lateinit var titleSlot: FrameLayout
     private lateinit var title: TextView
@@ -88,16 +84,14 @@ class MainActivity : Activity() {
     private lateinit var backButton: ImageView
     private lateinit var searchButton: ImageView
     private lateinit var closeSearchButton: ImageView
-    private var draggedRow: View? = null
     private var detailHeaderTitle: TextView? = null
     private var detailDeleteButton: TextView? = null
-    private lateinit var content: ReorderColumn
-    private lateinit var scroll: ScrollView
+    private lateinit var accountPage: AccountListPage
+    private lateinit var authenticatorPage: AuthenticatorListPage
+    private fun listPage(index: Int) = if (index == 0) accountPage else authenticatorPage
+    private val scroll get() = listPage(page).view
     private var drawer: FrameLayout? = null
     private var drawerClosing = false
-    private lateinit var pageHost: FrameLayout
-    private val pageScrolls = arrayOfNulls<ScrollView>(2)
-    private val pageContents = arrayOfNulls<ReorderColumn>(2)
     private var pageTransition = false
     private var panelAnimator: ValueAnimator? = null
     private var addExpanded = false
@@ -107,10 +101,7 @@ class MainActivity : Activity() {
     private var activeEditor: FloatingEditorDialog? = null
     private var pendingAttachmentEditor: CardEditor? = null
     private var pendingAttachmentSave: NewCardAttachment? = null
-    private var migrationQrUris = emptyList<String>()
-    private var migrationQrIndex = 0
-    private var migrationQrBitmap: Bitmap? = null
-    private var migrationQrImage: ImageView? = null
+    private var migrationPage: MigrationPage? = null
     private var updatingSearch = false
     private var downX = 0f
     private var downY = 0f
@@ -258,93 +249,35 @@ class MainActivity : Activity() {
         detailShowing = false; detailOverlay = null; detailSurface = null; detailClosing = false
         drawer = null; drawerClosing = false; pageTransition = false
         window.statusBarColor = SURFACE; window.navigationBarColor = SURFACE
-        root = FrameLayout(this).apply { setBackgroundColor(BACKGROUND) }
-        layout = column()
-        root.addView(layout, FrameLayout.LayoutParams(-1, -1))
-        bar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(SURFACE) }
-        val leftSlot = FrameLayout(this)
-        menuButton = ImageView(this).apply {
-            setImageResource(R.drawable.nav_menu); contentDescription = "打开导航菜单"
-            setPadding(dp(14), dp(14), dp(14), dp(14)); setOnClickListener { showDrawer() }
-        }
-        backButton = ImageView(this).apply {
-            setImageResource(R.drawable.nav_back); contentDescription = "关闭导航菜单"
-            alpha = 0f; visibility = View.GONE
-            setPadding(dp(14), dp(14), dp(14), dp(14)); setOnClickListener { closeDrawer() }
-        }
-        leftSlot.addView(menuButton, FrameLayout.LayoutParams(-1, -1))
-        leftSlot.addView(backButton, FrameLayout.LayoutParams(-1, -1))
-        bar.addView(leftSlot, LinearLayout.LayoutParams(dp(56), dp(56)))
-        titleSlot = FrameLayout(this)
-        title = text("", 20, true).apply { gravity = Gravity.CENTER }
-        titleSlot.addView(title, FrameLayout.LayoutParams(-1, dp(56)))
-        search = input("").apply {
-            alpha = 0f
-            visibility = View.INVISIBLE
+        root = layoutInflater.inflate(R.layout.activity_home, null) as FrameLayout
+        bar = root.findViewById(R.id.home_toolbar)
+        titleSlot = root.findViewById(R.id.home_title_slot)
+        title = root.findViewById(R.id.home_title)
+        menuButton = root.findViewById<ImageView>(R.id.home_menu).apply { setOnClickListener { showDrawer() } }
+        backButton = root.findViewById<ImageView>(R.id.home_back).apply { setOnClickListener { closeDrawer() } }
+        searchButton = root.findViewById<ImageView>(R.id.home_search_open).apply { setOnClickListener { toggleSearch() } }
+        closeSearchButton = root.findViewById<ImageView>(R.id.home_search_close).apply { setOnClickListener { toggleSearch() } }
+        search = root.findViewById<EditText>(R.id.home_search).apply {
+            configureInput(this, "")
             addTextChangedListener(TextChanged { value ->
-                if (!updatingSearch) { queries[page] = value; render(false) }
+                if (!updatingSearch && queries[page] != value) { queries[page] = value; render(false) }
             })
         }
-        val searchParams = FrameLayout.LayoutParams(-1, dp(52), Gravity.CENTER)
-        searchParams.leftMargin = dp(4); searchParams.rightMargin = dp(4)
-        titleSlot.addView(search, searchParams)
-        bar.addView(titleSlot, LinearLayout.LayoutParams(0, dp(56), 1f))
-        val rightSlot = FrameLayout(this)
-        searchButton = ImageView(this).apply {
-            setImageResource(R.drawable.nav_search); contentDescription = "搜索"
-            setPadding(dp(14), dp(14), dp(14), dp(14)); setOnClickListener { toggleSearch() }
-        }
-        closeSearchButton = ImageView(this).apply {
-            setImageResource(R.drawable.nav_close); contentDescription = "关闭搜索"
-            alpha = 0f; visibility = View.GONE
-            setPadding(dp(14), dp(14), dp(14), dp(14)); setOnClickListener { toggleSearch() }
-        }
-        rightSlot.addView(searchButton, FrameLayout.LayoutParams(-1, -1))
-        rightSlot.addView(closeSearchButton, FrameLayout.LayoutParams(-1, -1))
-        bar.addView(rightSlot, LinearLayout.LayoutParams(dp(56), dp(56)))
-        layout.addView(bar)
-        addPanel = column().apply {
-            visibility = View.GONE
+        addPanel = root.findViewById<LinearLayout>(R.id.home_add_panel).apply {
             background = SmoothDrawable(SURFACE, resources.displayMetrics.density, 24f, RULE, .5f, roundTop = false)
-            clipToOutline = true
-            elevation = dp(3).toFloat()
         }
-        addReveal = View(this).apply { setBackgroundColor(palette.random()); scaleX = 0f; pivotX = 0f }
-        addPanel.addView(addReveal, LinearLayout.LayoutParams(-1, dp(4)))
-        layout.addView(addPanel, LinearLayout.LayoutParams(-1, 0))
-        pageHost = FrameLayout(this)
-        layout.addView(pageHost, LinearLayout.LayoutParams(-1, 0, 1f))
+        addReveal = root.findViewById<View>(R.id.home_add_reveal).apply { setBackgroundColor(palette.random()) }
+        val pageHost = root.findViewById<FrameLayout>(R.id.home_page_host)
+        accountPage = AccountListPage(this, pageHost, { db }, { dragging = it }, ::notify, ::showCard)
+        authenticatorPage = AuthenticatorListPage(this, pageHost, { db }, { dragging = it }, ::notify, ::showTotpCard)
         for (index in 0..1) {
-            val list = ScrollView(this).apply { clipToPadding = false; isFillViewport = true; overScrollMode = View.OVER_SCROLL_NEVER }
-            val rows = ReorderColumn(this).apply {
-                pad(16)
-                onDragStateChanged = { active ->
-                    dragging = active
-                    draggedRow?.let { row ->
-                        (row.getTag(R.id.drag_dot) as? ColorDotView)?.emphasize(active)
-                        row.elevation = dp(if (active) 14 else 3).toFloat()
-                        val rowColor = row.getTag(R.id.drag_color) as? Int
-                        rowColor?.let {
-                            val shadow = if (active) it else Color.LTGRAY
-                            row.outlineAmbientShadowColor = shadow
-                            row.outlineSpotShadowColor = shadow
-                        }
-                    }
-                    if (!active) draggedRow = null
-                }
-                onOrderChanged = {
-                    val ids = (0 until childCount).mapNotNull { getChildAt(it).tag as? Long }
-                    runCatching { if (index == 0) db.reorderCards(ids) else db.reorderTotp(ids) }
-                        .onFailure { notify(it.message ?: "排序未保存") }
-                }
-                onEdgeDrag = { rawY -> autoScrollDuringDrag(list, rawY) }
-            }
-            list.addView(rows)
-            pageScrolls[index] = list; pageContents[index] = rows
-            pageHost.addView(list, FrameLayout.LayoutParams(-1, -1))
-            list.visibility = if (index == page) View.VISIBLE else View.GONE
+            val view = listPage(index).view
+            view.visibility = if (index == page) View.VISIBLE else View.INVISIBLE
+            pageHost.addView(view)
         }
-        scroll = checkNotNull(pageScrolls[page]); content = checkNotNull(pageContents[page])
+        pageScrubInProgress = false
+        offsetMillis = db.setting("time_offset_ms", "0").toLongOrNull() ?: 0L
+
         addExpanded = false; inlineTotp = false; pullReveal = false
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             if (addExpanded && !pullReveal && panelAnimator?.isRunning != true) {
@@ -353,8 +286,17 @@ class MainActivity : Activity() {
             }
         }
         transitionContent(root, direction)
+        syncSecureFlag()
         restoreHeader()
         render()
+        val shownRoot = root
+        shownRoot.postOnAnimation {
+            shownRoot.postOnAnimation {
+                if (root === shownRoot && shownRoot.isAttachedToWindow && homeVisible && subPage == null && !busy) {
+                    prepareList(1 - page)
+                }
+            }
+        }
         handleShortcut()
     }
 
@@ -394,13 +336,13 @@ class MainActivity : Activity() {
 
     private fun restoreHeader() {
         title.animate().cancel(); search.animate().cancel(); searchAnimator?.cancel()
-        title.text = if (page == 0) "Account Info" else "Authenticator"
+        title.setText(if (page == 0) R.string.account_page_title else R.string.otp_page_title)
         title.alpha = if (searchShown[page]) 0f else 1f
         title.translationX = 0f; title.translationY = 0f
         updatingSearch = true
         search.setText(queries[page])
         updatingSearch = false
-        search.hint = if (page == 0) "搜索标签或备注" else "搜索服务商或账户"
+        search.setHint(if (page == 0) R.string.account_search_hint else R.string.otp_search_hint)
         search.visibility = if (searchShown[page]) View.VISIBLE else View.INVISIBLE
         search.translationX = 0f; search.alpha = if (searchShown[page]) 1f else 0f
         (search.background as? UnderlineDrawable)?.reveal = 1f
@@ -416,7 +358,6 @@ class MainActivity : Activity() {
         closeAddPanel(immediate = true)
         hideKeyboard()
         page = selected
-        scroll = checkNotNull(pageScrolls[page]); content = checkNotNull(pageContents[page])
         pageTransition = true
         if (needsSecure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val outgoingTitle = text(title.text.toString(), 20, true).apply {
@@ -436,32 +377,32 @@ class MainActivity : Activity() {
         title.translationX = -direction * dp(12)
         title.alpha = 0f
         title.animate().translationX(0f).alpha(if (searchShown[page]) 0f else 1f).setDuration(100).start()
-        render()
-        scroll.visibility = View.VISIBLE
-        if (fromScrub) {
-            outgoing.animate().translationX(direction * pageScrubWidth).alpha(0f).setDuration(210).start()
-            scroll.animate().translationX(0f).alpha(1f).setDuration(230).setInterpolator(DecelerateInterpolator()).withEndAction {
-                outgoing.visibility = View.GONE; outgoing.translationX = 0f; outgoing.alpha = 1f
-                pageTransition = false; pageScrubInProgress = false; syncSecureFlag()
-            }.start()
-        } else {
-            scroll.translationX = -direction * dp(28); scroll.alpha = 0f
-            outgoing.animate().translationX(direction * dp(28)).alpha(0f).setDuration(210).start()
-            scroll.animate().translationX(0f).alpha(1f).setDuration(230).setInterpolator(DecelerateInterpolator()).withEndAction {
-            outgoing.visibility = View.GONE; outgoing.translationX = 0f; outgoing.alpha = 1f
-            pageTransition = false; syncSecureFlag()
-            }.start()
+        prepareList(page)
+        if (page == 1) updateCodes()
+        val incoming = scroll
+        incoming.visibility = View.VISIBLE
+        if (!fromScrub) {
+            incoming.translationX = -direction * dp(28)
+            incoming.alpha = 0f
         }
+        val travel = if (fromScrub) pageScrubWidth else dp(28).toFloat()
+        outgoing.animate().translationX(direction * travel).alpha(0f).setDuration(210).start()
+        incoming.animate().translationX(0f).alpha(1f).setDuration(230).setInterpolator(DecelerateInterpolator()).withEndAction {
+            outgoing.visibility = View.INVISIBLE; outgoing.translationX = 0f; outgoing.alpha = 1f
+            pageTransition = false; pageScrubInProgress = false; syncSecureFlag()
+        }.start()
     }
 
     private fun settlePageSwipe() {
         pageScrubInProgress = false
-        val incoming = pageScrolls[1 - page] ?: return
+        pageTransition = true
+        val incoming = listPage(1 - page).view
         val outgoing = scroll
         val direction = if (page == 0) 1f else -1f
         outgoing.animate().translationX(0f).alpha(1f).setDuration(170).start()
         incoming.animate().translationX(direction * pageScrubWidth).alpha(.72f).setDuration(170).withEndAction {
-            incoming.visibility = View.GONE; incoming.translationX = 0f; incoming.alpha = 1f
+            incoming.visibility = View.INVISIBLE; incoming.translationX = 0f; incoming.alpha = 1f
+            pageTransition = false; syncSecureFlag()
         }.start()
         title.animate().translationX(0f).alpha(if (searchShown[page]) 0f else 1f).setDuration(170).start()
     }
@@ -604,7 +545,7 @@ class MainActivity : Activity() {
         }
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             velocityTracker?.recycle(); velocityTracker = VelocityTracker.obtain()
-        }
+        } else if (velocityTracker == null) return super.dispatchTouchEvent(event)
         velocityTracker?.addMovement(event)
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             downX = event.rawX; downY = event.rawY; gesture = 0
@@ -637,7 +578,10 @@ class MainActivity : Activity() {
                     if (gesture == 8) {
                         pageScrubInProgress = true
                         pageScrubWidth = root.width.coerceAtLeast(1).toFloat()
-                        val incoming = checkNotNull(pageScrolls[1 - page])
+                        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                        prepareList(1 - page)
+                        if (page == 0) updateCodes()
+                        val incoming = listPage(1 - page).view
                         incoming.visibility = View.VISIBLE
                         incoming.translationX = if (page == 0) pageScrubWidth else -pageScrubWidth
                         incoming.alpha = .72f
@@ -655,10 +599,9 @@ class MainActivity : Activity() {
             }
             if (gesture == 3) {
                 val distance = (dy - dp(16)).coerceAtLeast(0f)
-                val progress = (distance / dp(160).toFloat()).coerceIn(0f, 1f)
-                val eased = progress * progress * (3f - 2f * progress)
-                addReveal.scaleX = eased
-                addPanel.layoutParams = addPanel.layoutParams.apply { height = (eased * panelTargetHeight()).toInt() }
+                val progress = (distance / dp(208).toFloat()).coerceIn(0f, 1f)
+                addReveal.scaleX = progress
+                addPanel.layoutParams = addPanel.layoutParams.apply { height = distance.toInt().coerceAtMost(panelTargetHeight()) }
                 addPanel.alpha = .45f + .55f * addReveal.scaleX
                 if (progress >= 1f) {
                     pullReveal = false; addExpanded = true
@@ -675,14 +618,14 @@ class MainActivity : Activity() {
                 val direction = if (page == 0) -1f else 1f
                 val translated = (dx * direction).coerceIn(0f, pageScrubWidth)
                 val outgoing = scroll
-                val incoming = checkNotNull(pageScrolls[1 - page])
+                val incoming = listPage(1 - page).view
                 outgoing.translationX = dx
                 incoming.translationX = dx + if (page == 0) pageScrubWidth else -pageScrubWidth
                 outgoing.alpha = 1f - translated / pageScrubWidth * .18f
                 incoming.alpha = .72f + translated / pageScrubWidth * .28f
                 val titleProgress = ((translated / pageScrubWidth) / .28f).coerceIn(0f, 1f)
                 title.translationX = dx * .3f
-                title.alpha = 1f - titleProgress
+                title.alpha = if (searchShown[page]) 0f else 1f - titleProgress
                 return true
             }
             if (gesture == 4 && drawerScrubInProgress) {
@@ -759,174 +702,20 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun render(animate: Boolean = true) {
-        if (!homeVisible || store.database == null) return
-        syncSecureFlag()
-        content.finish(true)
-        content.removeAllViews(); codeViews.clear()
-        offsetMillis = db.setting("time_offset_ms", "0").toLongOrNull() ?: 0L
-        if (page == 0) {
-            currentCards = db.cards(queries[0])
-            val showPreview = db.setting("show_card_preview", "0") == "1"
-            if (currentCards.isEmpty()) content.addView(empty("暂无账户卡片\n下拉列表添加账户"))
-            currentCards.forEachIndexed { index, card ->
-                val row = column().apply {
-                    background = smooth(Color.WHITE, 18f)
-                    clipToOutline = true
-                    elevation = dp(3).toFloat()
-                    pad(14)
-                    alpha = 1f; translationY = 0f
-                }
-                val line = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-                val dot = ColorDotView(this@MainActivity, card.color)
-                line.addView(dot, LinearLayout.LayoutParams(dp(34), dp(34)).apply { rightMargin = dp(10) })
-                line.addView(text(card.tag, 18, true), LinearLayout.LayoutParams(0, -2, 1f))
-                if (db.attachments(card.id).isNotEmpty()) {
-                    line.addView(ImageView(this).apply {
-                        setImageResource(R.drawable.ic_attachment)
-                        contentDescription = "包含图片附件"
-                    }, LinearLayout.LayoutParams(dp(20), dp(20)))
-                }
-                row.addView(line)
-                val previewValue = db.fields(card.id).firstOrNull()?.value.orEmpty()
-                val preview = text("", 15, true).apply {
-                    visibility = View.GONE; setTextColor(FOREGROUND); setPadding(dp(44), dp(4), 0, 0)
-                }
-                if (previewValue.isNotBlank()) {
-                    preview.visibility = View.VISIBLE
-                    preview.text = if (showPreview) previewValue else "•".repeat(previewValue.length.coerceAtMost(24))
-                }
-                row.addView(preview)
-                if (card.remark.isNotBlank()) {
-                    row.addView(text(card.remark, 13, color = MUTED).apply { setPadding(dp(44), dp(5), 0, 0) })
-                }
-                row.tag = card.id
-                row.setTag(R.id.drag_dot, dot); row.setTag(R.id.drag_color, card.color)
-                row.outlineAmbientShadowColor = Color.LTGRAY
-                row.outlineSpotShadowColor = Color.LTGRAY
-                row.setOnClickListener { showCard(card, row) }
-                row.setOnLongClickListener {
-                    if (queries[0].isNotEmpty()) notify("请先清除搜索，再拖动排序")
-                    else {
-                        draggedRow = row
-                        content.begin(row)
-                    }
-                    true
-                }
-                content.addView(row, cardParams())
-                enterRow(row, index, animate)
-            }
-        } else {
-            val entries = db.totpAccounts(queries[1])
-            if (entries.isEmpty()) content.addView(empty("暂无认证账户\n下拉列表扫描二维码或输入密钥"))
-            entries.forEachIndexed { index, account ->
-                val row = column().apply {
-                    background = smooth(Color.WHITE, 18f); clipToOutline = true; elevation = dp(3).toFloat(); pad(14)
-                    alpha = 1f; translationY = 0f
-                }
-                val head = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-                val dot = ColorDotView(this@MainActivity, account.color)
-                head.addView(dot, LinearLayout.LayoutParams(dp(34), dp(34)).apply { rightMargin = dp(10) })
-                head.addView(text(account.account.ifBlank { account.issuer }, 16, color = FOREGROUND), LinearLayout.LayoutParams(0, -2, 1f))
-                val code = text("", 27, true, BLUE)
-                if (account.type == "HOTP") {
-                    head.addView(ImageView(this).apply {
-                        setImageResource(R.drawable.ic_refresh)
-                        contentDescription = "生成下一验证码"
-                        setPadding(dp(10), dp(10), dp(10), dp(10))
-                        setOnClickListener { advanceHotp(account, code) }
-                    }, LinearLayout.LayoutParams(dp(44), dp(44)))
-                }
-                row.addView(head)
-                val track = FrameLayout(this).apply { clipChildren = true }
-                val progress = View(this).apply {
-                    background = smooth(account.color, 4f)
-                    pivotX = 0f
-                }
-                track.addView(progress, FrameLayout.LayoutParams(-1, dp(3), Gravity.START or Gravity.CENTER_VERTICAL))
-                row.addView(track, LinearLayout.LayoutParams(-1, dp(12)).apply { topMargin = dp(4) })
-                if (account.type == "HOTP") track.visibility = View.GONE
-                val codes = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-                val issuer = text(account.issuer.ifBlank { account.account }, 14, true)
-                codes.addView(issuer, LinearLayout.LayoutParams(0, -2, 1f))
-                codes.addView(code)
-                row.addView(codes)
-                row.tag = account.id
-                row.setTag(R.id.drag_dot, dot); row.setTag(R.id.drag_color, account.color)
-                row.outlineAmbientShadowColor = Color.LTGRAY
-                row.outlineSpotShadowColor = Color.LTGRAY
-                codeViews += Triple(account, code, progress)
-                row.setOnClickListener { showTotpCard(account, row) }
-                row.setOnLongClickListener {
-                    if (queries[1].isNotEmpty()) notify("请先清除搜索，再拖动排序")
-                    else {
-                        draggedRow = row
-                        content.begin(row)
-                    }
-                    true
-                }
-                content.addView(row, cardParams())
-                enterRow(row, index, animate)
-            }
-            updateCodes()
-        }
+    private fun prepareList(index: Int) {
+        if (!listPage(index).isLoaded) render(animate = false, index = index)
     }
 
-    private fun enterRow(row: View, index: Int, animate: Boolean) {
-        if (!animate) return
-        row.post {
-            val screenTop = IntArray(2); row.getLocationOnScreen(screenTop)
-            if (screenTop[1] < resources.displayMetrics.heightPixels) {
-                row.alpha = 0f; row.translationY = dp(14).toFloat()
-                row.animate().alpha(1f).translationY(0f).setStartDelay((8 - index.coerceAtMost(8)) * 18L)
-                    .setDuration(260).setInterpolator(DecelerateInterpolator()).start()
-            }
-        }
+    private fun render(animate: Boolean = true, index: Int = page) {
+        if (!homeVisible || subPage != null || store.database == null) return
+        listPage(index).refresh(queries[index], animate)
+        if (index == 1) updateCodes()
     }
 
     private fun updateCodes() {
-        val now = System.currentTimeMillis() + offsetMillis
-        codeViews.forEach { (entry, code, remaining) ->
-            if (entry.type == "HOTP") {
-                if (code.tag != entry.counter) {
-                    code.tag = entry.counter
-                    code.text = runCatching { Totp.hotp(entry.config(), entry.counter).chunked(3).joinToString(" ") }.getOrDefault("密钥无效")
-                }
-                remaining.visibility = View.GONE
-                return@forEach
-            }
-            remaining.visibility = View.VISIBLE
-            val step = Math.floorDiv(now, entry.period * 1000L)
-            if (code.tag != step) {
-                val hadCode = code.tag != null
-                code.tag = step
-                val value = runCatching { Totp.code(entry.config(), now).chunked(if (entry.digits == 8) 4 else 3).joinToString(" ") }.getOrDefault("密钥无效")
-                code.animate().cancel()
-                if (hadCode) code.animate().alpha(0f).translationY(-dp(4).toFloat()).setDuration(80).withEndAction {
-                    code.text = value; code.translationY = dp(4).toFloat()
-                    code.animate().alpha(1f).translationY(0f).setDuration(150).start()
-                }.start() else code.text = value
-            }
-            val elapsed = Math.floorMod(now, entry.period * 1000L).toFloat() / (entry.period * 1000L)
-            remaining.scaleX = (1f - elapsed).coerceIn(0f, 1f)
-        }
+        if (::authenticatorPage.isInitialized) authenticatorPage.updateCodes(offsetMillis)
     }
 
-    private fun advanceHotp(entry: TotpAccount, code: TextView) {
-        runCatching {
-            val counter = db.advanceHotpCounter(entry.id)
-            val updated = entry.copy(counter = counter)
-            val index = codeViews.indexOfFirst { it.first.id == entry.id }
-            if (index >= 0) codeViews[index] = Triple(updated, code, codeViews[index].third)
-            code.tag = counter
-            Totp.hotp(updated.config(), counter).chunked(3).joinToString(" ")
-        }.onSuccess { value ->
-            code.animate().alpha(0f).translationY(-dp(4).toFloat()).setDuration(70).withEndAction {
-                code.text = value; code.translationY = dp(4).toFloat()
-                code.animate().alpha(1f).translationY(0f).setDuration(130).start()
-            }.start()
-        }.onFailure { notify(it.message ?: "HOTP 验证码生成失败") }
-    }
     private fun showCard(card: AccountCard, source: View) {
         if (detailShowing || editorShowing) return
         closeAddPanel(immediate = true); hideKeyboard()
@@ -1293,7 +1082,7 @@ class MainActivity : Activity() {
     }
 
     private inner class TotpEditor(private val entry: TotpAccount?, scanned: TotpConfig? = null) {
-        private val defaults = scanned ?: entry?.config()
+        private val defaults = scanned ?: entry?.otpConfig()
         val body = column().apply { pad(16) }
         private var color = entry?.color ?: selectedTotpColor.takeIf { it != 0 } ?: palette.random()
         private val issuer = AutoCompleteTextView(this@MainActivity).apply {
@@ -1419,14 +1208,14 @@ class MainActivity : Activity() {
         } else footer.addView(button("取消") { dialog.dismiss() }.apply { setTextColor(MUTED) }, LinearLayout.LayoutParams(0, dp(50), 1f))
         footer.addView(button(if (entry == null) "添加" else "保存") { editor.save {
             dialog.dismiss()
-            if (page != 1) selectPage(1) else render()
+            render(animate = page == 1, index = 1)
+            if (page != 1) selectPage(1)
         } }.apply { setTextColor(BLUE) }, LinearLayout.LayoutParams(0, dp(50), 1f))
         showEditor(dialog)
     }
 
     private fun showTotpCard(entry: TotpAccount, source: View) {
-        val current = db.totpAccounts().firstOrNull { it.id == entry.id } ?: entry
-        editTotp(current, source = source)
+        editTotp(entry, source = source)
     }
 
     private fun openScanner() { selectedTotpColor = palette.random(); closeAddPanel(immediate = true); hideKeyboard(); startActivityForResult(Intent(this, QrScannerActivity::class.java), SCAN_REQUEST) }
@@ -1451,74 +1240,7 @@ class MainActivity : Activity() {
 
     private fun buildMigrationPage(body: LinearLayout) {
         clearMigrationExport()
-        body.addView(text("Google Authenticator 迁移", 18, true))
-        body.addView(text("扫描迁移二维码可导入 TOTP 和 HOTP 账户；也可选择 AuthNotes 账户生成供 Google Authenticator 扫描的二维码。", 14, color = MUTED))
-        body.addView(button("扫描迁移二维码导入") { openScanner() }.apply { setTextColor(BLUE) })
-        body.addView(View(this).apply { setBackgroundColor(RULE) }, LinearLayout.LayoutParams(-1, dp(1)))
-        body.addView(text("选择要导出的账户", 16, true).apply { setPadding(0, dp(12), 0, dp(4)) })
-        val accounts = db.totpAccounts()
-        if (accounts.isEmpty()) body.addView(empty("暂无认证账户"))
-        val selected = linkedSetOf<Long>()
-        accounts.forEach { entry ->
-            selected += entry.id
-            val check = CheckBox(this).apply {
-                val label = listOf(entry.issuer, entry.account).filter { it.isNotBlank() }.joinToString(" · ")
-                text = "$label  (${entry.type})"
-                isChecked = true
-                buttonTintList = android.content.res.ColorStateList.valueOf(BLUE)
-                setOnCheckedChangeListener { _, checked -> if (checked) selected += entry.id else selected -= entry.id }
-            }
-            body.addView(check, LinearLayout.LayoutParams(-1, dp(48)))
-        }
-        val qrPanel = column().apply { gravity = Gravity.CENTER; visibility = View.GONE; setPadding(0, dp(12), 0, dp(12)) }
-        body.addView(qrPanel)
-        body.addView(button("生成迁移二维码") {
-            val chosen = accounts.filter { it.id in selected }
-            runCatching { GoogleMigration.encodeUris(chosen.map { it.config() }) }
-                .onSuccess { uris -> migrationQrUris = uris; migrationQrIndex = 0; showMigrationQr(qrPanel) }
-                .onFailure { notify(it.message ?: "二维码生成失败") }
-        }.apply { setTextColor(BLUE) })
-    }
-
-    private fun showMigrationQr(panel: LinearLayout) {
-        if (migrationQrUris.isEmpty()) return
-        val uri = migrationQrUris[migrationQrIndex]
-        val matrix = runCatching {
-            val hints = mapOf<EncodeHintType, Any>(
-                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-                EncodeHintType.MARGIN to 2,
-                EncodeHintType.CHARACTER_SET to "UTF-8",
-            )
-            QRCodeWriter().encode(uri, BarcodeFormat.QR_CODE, 640, 640, hints)
-        }.getOrElse { notify("迁移二维码过于复杂，无法生成"); return }
-        val pixels = IntArray(matrix.width * matrix.height) { index ->
-            if (matrix[index % matrix.width, index / matrix.width]) Color.BLACK else Color.WHITE
-        }
-        val bitmap = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888).apply {
-            setPixels(pixels, 0, matrix.width, 0, 0, matrix.width, matrix.height)
-        }
-        migrationQrImage?.setImageDrawable(null)
-        migrationQrBitmap?.recycle()
-        migrationQrBitmap = bitmap
-        panel.removeAllViews(); panel.visibility = View.VISIBLE
-        val qrImage = ImageView(this).apply {
-            setImageBitmap(bitmap); scaleType = ImageView.ScaleType.FIT_CENTER
-            contentDescription = "Google Authenticator 迁移二维码 ${migrationQrIndex + 1} / ${migrationQrUris.size}"
-        }
-        migrationQrImage = qrImage
-        panel.addView(qrImage, LinearLayout.LayoutParams(dp(260), dp(260)))
-        panel.addView(text("第 ${migrationQrIndex + 1} / ${migrationQrUris.size} 张", 14, color = MUTED).apply { gravity = Gravity.CENTER })
-        if (migrationQrUris.size > 1) panel.addView(text("请按顺序扫描全部二维码", 12, color = MUTED).apply { gravity = Gravity.CENTER })
-        if (migrationQrUris.size > 1) {
-            val controls = LinearLayout(this).apply { gravity = Gravity.CENTER }
-            controls.addView(button("上一张") {
-                migrationQrIndex = (migrationQrIndex - 1).coerceAtLeast(0); showMigrationQr(panel)
-            }, LinearLayout.LayoutParams(0, dp(48), 1f))
-            controls.addView(button("下一张") {
-                migrationQrIndex = (migrationQrIndex + 1).coerceAtMost(migrationQrUris.lastIndex); showMigrationQr(panel)
-            }, LinearLayout.LayoutParams(0, dp(48), 1f))
-            panel.addView(controls)
-        }
+        migrationPage = MigrationPage(body, db.totpAccounts(), ::openScanner, ::notify)
     }
 
     private fun showDrawer(initialDrag: Float = 0f) {
@@ -1673,9 +1395,8 @@ class MainActivity : Activity() {
     }
 
     private fun clearMigrationExport() {
-        migrationQrUris = emptyList(); migrationQrIndex = 0
-        migrationQrImage?.setImageDrawable(null); migrationQrImage = null
-        migrationQrBitmap?.recycle(); migrationQrBitmap = null
+        migrationPage?.clearExport()
+        migrationPage = null
     }
 
     private fun buildImportPage(body: LinearLayout) {
@@ -1778,7 +1499,6 @@ class MainActivity : Activity() {
             buttonTintList = android.content.res.ColorStateList.valueOf(BLUE)
             setOnCheckedChangeListener { _, checked ->
                 db.updateSetting("show_card_preview", if (checked) "1" else "0")
-                render(false)
             }
         }
         body.addView(previewMode)
@@ -1835,7 +1555,7 @@ class MainActivity : Activity() {
     }
 
     private fun syncSecureFlag() {
-        val secure = homeVisible && (((page == 1 || pageTransition) && subPage == null) || subPage == SubPage.MIGRATION)
+        val secure = homeVisible && (((page == 1 || pageTransition || pageScrubInProgress) && subPage == null) || subPage == SubPage.MIGRATION)
         if (secure || secureTransition || detailShowing) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
@@ -2149,7 +1869,10 @@ class MainActivity : Activity() {
     private fun text(value: String, size: Int = 15, bold: Boolean = false, color: Int = FOREGROUND) = TextView(this).apply {
         text = value; textSize = size.toFloat(); setTextColor(color); if (bold) typeface = Typeface.DEFAULT_BOLD
     }
-    private fun input(hintValue: String, secret: Boolean = false) = EditText(this).apply {
+    private fun input(hintValue: String, secret: Boolean = false) =
+        EditText(this).also { configureInput(it, hintValue, secret) }
+
+    private fun configureInput(field: EditText, hintValue: String, secret: Boolean = false) = with(field) {
         hint = hintValue; textSize = 18f; setSingleLine(true); setTextColor(FOREGROUND); setHintTextColor(MUTED); setPadding(dp(8), dp(10), dp(8), dp(8))
         val line = underline()
         background = line
@@ -2194,7 +1917,6 @@ class MainActivity : Activity() {
     }
 }
 
-private fun TotpAccount.config() = TotpConfig(issuer, account, secret, algorithm, digits, period, type, counter)
 private class TextChanged(private val changed: (String) -> Unit) : android.text.TextWatcher {
     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { changed(s?.toString().orEmpty()) }

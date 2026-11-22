@@ -30,6 +30,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Keep the sideloaded APK small. Android extracts the native library at install time.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

@@ -16,6 +16,8 @@ data class NewCardAttachment(val name: String, val mimeType: String, val content
 data class TotpAccount(val id: Long, val issuer: String, val account: String, val secret: String,
     val algorithm: String, val digits: Int, val period: Int, val type: String, val counter: Long, val color: Int, val order: Long)
 
+internal fun TotpAccount.otpConfig() = TotpConfig(issuer, account, secret, algorithm, digits, period, type, counter)
+
 class VaultDatabase private constructor(private val db: SQLiteDatabase) : AutoCloseable {
     @Synchronized fun cards(query: String = "", deleted: Boolean = false): List<AccountCard> {
         val escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
