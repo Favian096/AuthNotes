@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:gravity="center_vertical">
+    <TextView
+        android:id="@+id/attachment_file_name"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_weight="1"
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary" />
+    <TextView
+        android:id="@+id/attachment_file_size"
+        android:layout_width="56dp"
+        android:layout_height="48dp"
+        android:textSize="12sp"
+        android:textColor="@color/text_muted" />
+    <TextView
+        android:id="@+id/attachment_file_share"
+        style="@style/Widget.AuthNotes.EditorAction"
+        android:layout_width="52dp"
+        android:layout_height="48dp"
+        android:text="@string/attachment_share"
+        android:textSize="13sp"
+        android:textColor="@color/accent_blue" />
+    <TextView
+        android:id="@+id/attachment_file_save"
+        style="@style/Widget.AuthNotes.EditorAction"
+        android:layout_width="52dp"
+        android:layout_height="48dp"
+        android:text="@string/editor_save"
+        android:textSize="13sp"
+        android:textColor="@color/accent_blue" />
+</LinearLayout>

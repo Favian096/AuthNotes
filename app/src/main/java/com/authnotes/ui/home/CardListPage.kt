@@ -27,7 +27,8 @@ internal abstract class CardListPage(
     private val rows = view.findViewById<ReorderColumn>(R.id.card_rows)
     private var draggedRow: View? = null
     private var renderedQuery: String? = null
-    val isLoaded get() = renderedQuery != null
+    private var requestedQuery: String? = null
+    val isLoaded get() = renderedQuery != null || requestedQuery != null
 
     init {
         view.isSaveFromParentEnabled = false
@@ -63,10 +64,43 @@ internal abstract class CardListPage(
     }
 
     fun refresh(query: String, animate: Boolean) {
+        requestedQuery = query
         rows.finish(true)
         rows.removeAllViews()
         renderedQuery = query
+        requestedQuery = null
         bindRows(query, animate)
+    }
+
+    fun requestRefresh(query: String) { requestedQuery = query }
+
+    fun invalidate() { renderedQuery = null; requestedQuery = null }
+
+    protected fun reconcileRows(
+        query: String,
+        ids: List<Long>,
+        emptyMessage: Int,
+        animate: Boolean,
+        bind: (Long, View?) -> View,
+    ) {
+        if (requestedQuery != query) return
+        val existing = (0 until rows.childCount).mapNotNull { index ->
+            val row = rows.getChildAt(index)
+            (row.tag as? Long)?.let { it to row }
+        }.toMap().toMutableMap()
+        rows.finish(true)
+        rows.removeAllViews()
+        renderedQuery = query
+        requestedQuery = null
+        if (ids.isEmpty()) {
+            showEmpty(emptyMessage)
+            return
+        }
+        ids.forEachIndexed { index, id ->
+            val old = existing.remove(id)
+            val row = bind(id, old)
+            if (old == null) addCard(row, index, animate) else rows.addView(row)
+        }
     }
 
     protected abstract fun bindRows(query: String, animate: Boolean)
@@ -82,25 +116,34 @@ internal abstract class CardListPage(
     }
 
     protected fun inflateCard(layout: Int, id: Long, color: Int, onOpen: (View) -> Unit): View =
-        inflater.inflate(layout, rows, false).apply {
-            background = surface(Color.WHITE, 18f)
-            val dot = ColorDotView(context, color)
-            findViewById<FrameLayout>(R.id.card_color_slot).addView(dot, FrameLayout.LayoutParams(-1, -1))
-            tag = id
-            setTag(R.id.drag_dot, dot)
-            setTag(R.id.drag_color, color)
-            outlineAmbientShadowColor = Color.LTGRAY
-            outlineSpotShadowColor = Color.LTGRAY
-            setOnClickListener { onOpen(it) }
-            setOnLongClickListener {
-                if (!renderedQuery.isNullOrEmpty()) notify(context.getString(R.string.card_reorder_clear_search))
-                else {
-                    draggedRow = this
-                    rows.begin(this)
-                }
-                true
+        inflater.inflate(layout, rows, false).apply { background = surface(Color.WHITE, 18f) }
+            .also { bindCard(it, id, color, onOpen) }
+
+    protected fun bindCard(row: View, id: Long, color: Int, onOpen: (View) -> Unit) {
+        val oldColor = row.getTag(R.id.drag_color) as? Int
+        val slot = row.findViewById<FrameLayout>(R.id.card_color_slot)
+        val dot = if (oldColor == color) row.getTag(R.id.drag_dot) as? ColorDotView else null
+        if (dot == null) {
+            slot.removeAllViews()
+            ColorDotView(context, color).also {
+                slot.addView(it, FrameLayout.LayoutParams(-1, -1))
+                row.setTag(R.id.drag_dot, it)
             }
         }
+        row.tag = id
+        row.setTag(R.id.drag_color, color)
+        row.outlineAmbientShadowColor = Color.LTGRAY
+        row.outlineSpotShadowColor = Color.LTGRAY
+        row.setOnClickListener { onOpen(it) }
+        row.setOnLongClickListener {
+            if (!renderedQuery.isNullOrEmpty() || requestedQuery != null) notify(context.getString(R.string.card_reorder_clear_search))
+            else {
+                draggedRow = row
+                rows.begin(row)
+            }
+            true
+        }
+    }
 
     protected fun addCard(row: View, index: Int, animate: Boolean) {
         rows.addView(row)

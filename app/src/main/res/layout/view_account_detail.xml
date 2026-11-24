@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="18dp">
+    <TextView
+        android:id="@+id/account_detail_id"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="@color/text_muted" />
+    <TextView
+        android:id="@+id/account_detail_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="5dp"
+        android:paddingBottom="12dp"
+        android:textSize="13sp"
+        android:textColor="@color/text_muted" />
+    <View
+        android:id="@+id/account_detail_color"
+        android:layout_width="match_parent"
+        android:layout_height="3dp" />
+    <TextView
+        android:id="@+id/account_detail_tag"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:paddingBottom="6dp"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary" />
+    <LinearLayout
+        android:id="@+id/account_detail_fields"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+    <TextView
+        android:id="@+id/account_detail_remark"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="8dp"
+        android:textSize="16sp"
+        android:textColor="@color/text_primary" />
+    <LinearLayout
+        android:id="@+id/account_detail_attachments"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="@string/attachment_title"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_muted" />
+            <ProgressBar
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/text_muted" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

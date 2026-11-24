@@ -3,12 +3,13 @@ package com.authnotes.ui
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.util.AttributeSet
 import android.view.MotionEvent
 import android.widget.ImageView
 import kotlin.math.atan2
 import kotlin.math.min
 
-class ZoomRotateImageView(context: Context) : ImageView(context) {
+class ZoomRotateImageView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : ImageView(context, attrs) {
     private val transform = Matrix()
     private var lastX = 0f
     private var lastY = 0f

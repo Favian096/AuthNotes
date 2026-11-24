@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <FrameLayout
+        android:id="@+id/otp_editor_color_slot"
+        android:layout_width="match_parent"
+        android:layout_height="64dp" />
+    <LinearLayout
+        android:id="@+id/otp_editor_issuer_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Widget.AuthNotes.EditorLabel"
+            android:text="@string/editor_tag" />
+        <AutoCompleteTextView
+            android:id="@+id/otp_editor_issuer"
+            style="@style/Widget.AuthNotes.EditorInput"
+            android:hint="@string/otp_editor_issuer"
+            android:tag="initial-input" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/otp_editor_account_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Widget.AuthNotes.EditorLabel"
+            android:text="@string/otp_editor_account" />
+        <EditText
+            android:id="@+id/otp_editor_account"
+            style="@style/Widget.AuthNotes.EditorInput"
+            android:hint="@string/otp_editor_account_hint" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/otp_editor_secret_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Widget.AuthNotes.EditorLabel"
+            android:text="@string/otp_editor_secret" />
+        <EditText
+            android:id="@+id/otp_editor_secret"
+            style="@style/Widget.AuthNotes.EditorInput"
+            android:hint="@string/otp_editor_secret_hint"
+            android:inputType="textNoSuggestions" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/otp_editor_type_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Widget.AuthNotes.EditorLabel"
+            android:text="@string/otp_editor_type" />
+        <Spinner
+            android:id="@+id/otp_editor_type"
+            style="@style/Widget.AuthNotes.EditorInput"
+            android:layout_height="48dp" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/otp_editor_algorithm"
+            android:textColor="@color/text_muted"
+            android:textSize="14sp" />
+        <Spinner
+            android:id="@+id/otp_editor_algorithm"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/otp_editor_digits"
+            android:textColor="@color/text_muted"
+            android:textSize="14sp" />
+        <Spinner
+            android:id="@+id/otp_editor_digits"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="0.8" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/otp_editor_period_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Widget.AuthNotes.EditorLabel"
+            android:text="@string/otp_editor_period" />
+        <EditText
+            android:id="@+id/otp_editor_period"
+            style="@style/Widget.AuthNotes.EditorInput"
+            android:hint="@string/otp_editor_period_hint"
+            android:inputType="number" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/otp_editor_counter_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Widget.AuthNotes.EditorLabel"
+            android:text="@string/otp_editor_counter" />
+        <EditText
+            android:id="@+id/otp_editor_counter"
+            style="@style/Widget.AuthNotes.EditorInput"
+            android:hint="@string/otp_editor_counter_hint"
+            android:inputType="number" />
+    </LinearLayout>
+</LinearLayout>

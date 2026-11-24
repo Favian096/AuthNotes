@@ -3,10 +3,13 @@
     <color name="surface">#FAFAFA</color>
     <color name="rule">#EDEDED</color>
     <color name="text_muted">#717171</color>
+    <color name="drawer_text">#55585A</color>
     <color name="text_primary">#3C3F41</color>
     <color name="accent_green">#34C759</color>
     <color name="accent_blue">#007AFF</color>
     <color name="accent_red">#FF3B30</color>
+    <color name="action_delete">#B87574</color>
+    <color name="floating_surface">#F2FFFFFF</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

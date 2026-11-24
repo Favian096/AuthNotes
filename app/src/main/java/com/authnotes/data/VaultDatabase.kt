@@ -10,6 +10,7 @@ import java.io.File
 // Timestamps are epoch milliseconds. Lower sortOrder values appear first.
 data class AccountCard(val id: Long, val tag: String, val createTime: Long, val updateTime: Long,
     val color: Int, val remark: String, val order: Long)
+data class AccountListEntry(val card: AccountCard, val firstFieldValue: String, val hasAttachments: Boolean)
 data class CardField(val id: Long, val name: String, val value: String, val order: Long)
 data class CardAttachment(val id: Long, val cardId: Long, val name: String, val mimeType: String, val size: Long, val order: Long)
 data class NewCardAttachment(val name: String, val mimeType: String, val content: ByteArray)
@@ -26,6 +27,22 @@ class VaultDatabase private constructor(private val db: SQLiteDatabase) : AutoCl
                 "WHERE deleted=? AND (tag LIKE ? ESCAPE '\\' OR remark LIKE ? ESCAPE '\\') ORDER BY sort_order,id DESC",
             arrayOf(if (deleted) "1" else "0", "%$escaped%", "%$escaped%")
         ).use { it.collect { c -> AccountCard(c.getLong(0), c.getString(1), c.getLong(2), c.getLong(3), c.getInt(4), c.getString(5), c.getLong(6)) } }
+    }
+
+    @Synchronized fun accountList(query: String = ""): List<AccountListEntry> {
+        val escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return db.rawQuery(
+            "SELECT c.id,c.tag,c.create_time,c.update_time,c.color,c.remark,c.sort_order," +
+                "COALESCE((SELECT f.value FROM card_fields f WHERE f.card_id=c.id ORDER BY f.sort_order,f.id LIMIT 1),'')," +
+                "EXISTS(SELECT 1 FROM card_attachments a WHERE a.card_id=c.id) " +
+                "FROM account_cards c WHERE c.deleted=0 AND (c.tag LIKE ? ESCAPE '\\' OR c.remark LIKE ? ESCAPE '\\') " +
+                "ORDER BY c.sort_order,c.id DESC",
+            arrayOf("%$escaped%", "%$escaped%")
+        ).use { cursor -> cursor.collect { row ->
+            val card = AccountCard(row.getLong(0), row.getString(1), row.getLong(2), row.getLong(3),
+                row.getInt(4), row.getString(5), row.getLong(6))
+            AccountListEntry(card, row.getString(7), row.getInt(8) != 0)
+        } }
     }
 
     @Synchronized fun fields(cardId: Long): List<CardField> = db.rawQuery(
